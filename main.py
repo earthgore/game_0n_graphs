@@ -1,8 +1,9 @@
 import random
-import time
 from copy import copy
 import pygame as pg
-from Tree import Game
+from Games import Game_xxx
+from Games import GameCircle
+from math import sin, cos, pi
 import pygame_menu
 pg.init()
 Difficulty = 5
@@ -46,7 +47,7 @@ class Button:
         else: return False
 
 
-def make_game(game : Game):
+def make_game_xxx(game):
     if not game.check_lose():
         for i in range(len(game)):
             if game.can_do_move(i):
@@ -54,7 +55,22 @@ def make_game(game : Game):
                 new_field[i] = "X"
                 game.create_child(new_field)
                 game.children[-1].id = str(game.id) + "_" + str(i)
-                make_game(game.children[-1])
+                make_game_xxx(game.children[-1])
+    else:
+        root = game.get_root()
+        root.terms.append(game)
+
+
+def make_game_circle(game):
+    if not game.check_lose():
+        for i in range(len(game)):
+            for j in range(len(game)):
+                if game.can_do_move(i, j) and i != j:
+                    new_edges = copy(game.edges)
+                    new_edges.append([i, j])
+                    game.create_child(new_edges)
+                    game.children[-1].id = str(game.id) + "_" + str(i)
+                    make_game_circle(game.children[-1])
     else:
         root = game.get_root()
         root.terms.append(game)
@@ -75,7 +91,6 @@ def bfs_lvl(root):
                 List.append(v.children[i])
                 if Q[-2].pos[1] == v.pos[1] + 80:
                     v.children[i].pos[0] = Q[-2].pos[0] + 50
-
 
 
 def vertex_marking(root, list_of_edges, vertexes):
@@ -124,14 +139,38 @@ def set_difficulty(value = "5"):
     Difficulty = int(value)
 
 
-def win_check(field):
+def win_check_xxx(field):
     for i in range(len(field)):
         if field[i - 1] == "X" and field[i] == "X" and field[(i + 1) % len(field)] == "X":
             return True
     return False
 
 
-def vertex_merge(vertexes : set):
+def edge_com(edges1, edges2):
+    if edges1 == [] or edges2 == []:
+        return False
+    elif len(edges1) != len(edges2):
+        return False
+    for i in range(len(edges1)):
+        if (edges1[i][0] != edges2[i][0] or edges1[i][1] != edges2[i][1]) and (edges1[i][1] != edges2[i][0] or edges1[i][0] != edges2[i][1]):
+            return False
+    return True
+
+
+def vertex_merge_circle(vertexes : set):
+    vertexes = list(vertexes)
+    for v1 in vertexes:
+        for v2 in vertexes:
+            if v1 != v2 and edge_com(v1.edges, v2.edges):
+                v1.parents.extend(v2.parents)
+                for v3 in v2.parents:
+                    v3.children.append(v1)
+                    v3.children.remove(v2)
+                vertexes.remove(v2)
+    return vertexes
+
+
+def vertex_merge_xxx(vertexes : set):
     vertexes = list(vertexes)
     for v1 in vertexes:
         for v2 in vertexes:
@@ -147,7 +186,7 @@ def vertex_merge(vertexes : set):
 def get_vertexes(root):
     vertexes = set()
 
-    def create_vertex(root: Game):
+    def create_vertex(root):
         nonlocal vertexes
         """flag = True
         v1 = root
@@ -166,13 +205,16 @@ def get_vertexes(root):
                 create_vertex(root.children[i])
 
     create_vertex(root)
-    return vertex_merge(vertexes)
+    if type(root) is GameCircle:
+        return vertex_merge_circle(vertexes)
+    else:
+        return vertex_merge_xxx(vertexes)
 
 
 def get_edges(root):
     list_of_edges = []
 
-    def create_edges(root: Game):
+    def create_edges(root):
         nonlocal list_of_edges
         if root.children:
             for i in range(len(root.children)):
@@ -183,7 +225,7 @@ def get_edges(root):
     return list_of_edges
 
 
-def bot_decision(root : Game):
+def bot_decision(root : Game_xxx):
     if root.mark == "N":
         for i in range(len(root.children)):
             if root.children[i].mark == "P":
@@ -219,8 +261,8 @@ def start_game_xxx():
     text_y = (1 / 2) * sc.get_height() - text_rect.height / 2
     sc.blit(text1, [text_x, text_y])
     pg.display.update()
-    game_xxx = Game(["_" for i in range(a)])
-    make_game(game_xxx)
+    game_xxx = Game_xxx(["_" for i in range(a)])
+    make_game_xxx(game_xxx)
     vertexes = get_vertexes(game_xxx)
     list_of_edges = get_edges(game_xxx)
     vertex_marking(vertexes=vertexes, list_of_edges=list_of_edges, root=game_xxx)
@@ -235,7 +277,7 @@ def start_game_xxx():
     btn = Button(sc, WHITE, 10, 150, 150, 40, 40, "Перезапуск", BLACK)
     btn_grph = Button(sc, WHITE, 210, 150, 150, 40, 40, "Вывод графа", BLACK)
     while True:
-        game_over = game_over if game_over else win_check(field)
+        game_over = game_over if game_over else win_check_xxx(field)
         if game_over:
             font = pg.font.SysFont('Calibri', 45)
             if query == 0:
@@ -313,6 +355,152 @@ def start_game_xxx():
         clock.tick(FPS)
 
 
+def start_game_circle():
+    global Difficulty
+    a = Difficulty
+    WIDTH = 1200
+    HEIGTH = 600
+    sc = pg.display.set_mode((WIDTH, HEIGTH))
+    pg.display.set_caption('Крeub!')
+
+    clock = pg.time.Clock()
+
+    FPS = 30
+
+    BLACK = (0, 0, 0)
+    WHITE = (255, 255, 255)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+
+    sc.fill(BLACK)
+    font = pg.font.SysFont('Calibri', 45)
+    text1 = font.render("Loading", True, WHITE, 5)
+    text_rect = text1.get_rect()
+    text_x = sc.get_width() / 2 - text_rect.width / 2
+    text_y = (1 / 2) * sc.get_height() - text_rect.height / 2
+    sc.blit(text1, [text_x, text_y])
+    pg.display.update()
+
+    game_circle = GameCircle([], a)
+    make_game_circle(game_circle)
+    vertexes = get_vertexes(game_circle)
+    list_of_edges = get_edges(game_circle)
+    vertex_marking(vertexes=vertexes, list_of_edges=list_of_edges, root=game_circle)
+
+    sc.fill(BLACK)
+    center = (500, 400)
+    r = 100
+    pg.draw.circle(sc, WHITE, center, r + 2)
+    pg.draw.circle(sc, BLACK, center, r)
+
+    dots = []
+    angle = 0
+    while angle < 2 * pi:
+        dots.append((int(-sin(angle) * r + center[0]), int(cos(angle) * r + center[1])))
+        angle += 2 * pi / a
+    dot_btns = []
+    for dot in dots:
+        pg.draw.circle(sc, RED, dot, 4)
+        dot_btns.append(Button(x=dot[0] - 4, y=dot[1] - 4, length=2*4, height=2*4))
+
+    query = 0
+    field = copy(game_circle.nodes)
+    edges = []
+    game_over = False
+    btn = Button(sc, WHITE, 10, 150, 150, 40, 40, "Перезапуск", BLACK)
+    btn_grph = Button(sc, WHITE, 210, 150, 150, 40, 40, "Вывод графа", BLACK)
+    move = []
+    while True:
+        game_over = game_over if game_over else game_circle.check_lose()
+        if game_over:
+            font = pg.font.SysFont('Calibri', 45)
+            if query == 0:
+                text1 = font.render("You win", True, WHITE, 5)
+            else:
+                text1 = font.render("You lose", True, WHITE, 5)
+            text_rect = text1.get_rect()
+            text_x = sc.get_width() / 2 - text_rect.width / 2 + 100
+            text_y = (3 / 4) * sc.get_height() - text_rect.height / 2
+            sc.blit(text1, [text_x, text_y])
+
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                quit()
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                x_mouse, y_mouse = pg.mouse.get_pos()
+                for col in range(len(dot_btns)):
+                    if dot_btns[col].pressed((x_mouse, y_mouse)) and not game_over:
+                        if field[col]:
+                            move.append(col)
+                            query = 0
+                            if len(move) == 2:
+                                if game_circle.can_do_move(move[0], move[1]):
+                                    field[move[0]] = False
+                                    field[move[1]] = False
+                                    edges.append(move)
+                                    for i in range(len(game_circle.children)):
+                                        if game_circle.children[i].nodes == field:
+                                            game_circle = game_circle.children[i]
+                                            break
+                                    pg.draw.line(sc, WHITE, dots[move[0]], dots[move[1]])
+                                    pg.draw.circle(sc, RED, dots[move[0]], 4)
+                                    pg.draw.circle(sc, RED, dots[move[1]], 4)
+                                    move.clear()
+                                    game_circle, flag = bot_decision(game_circle)
+                                    if flag:
+                                        for i in range(len(field)):
+                                            if field[i] != game_circle.nodes[i]:
+                                                move.append(i)
+
+                                        pg.draw.line(sc, WHITE, dots[move[0]], dots[move[1]])
+                                        pg.draw.circle(sc, RED, dots[move[0]], 4)
+                                        pg.draw.circle(sc, RED, dots[move[1]], 4)
+                                        move.clear()
+                                        field = copy(game_circle.nodes)
+                                        edges = game_circle.edges[::]
+                                        query = 1
+                                    else:
+                                        game_over = True
+                                else:
+                                    pg.draw.circle(sc, RED, dots[move[0]], 4)
+                                    pg.draw.circle(sc, RED, dots[move[1]], 4)
+                                    move.clear()
+                            pg.draw.circle(sc, GREEN, dots[col], 4)
+                if btn.pressed((x_mouse, y_mouse)):
+                    game_over = False
+                    game_circle = game_circle.get_root()
+                    field = copy(game_circle.nodes)
+                    edges.clear()
+                    sc.fill(BLACK)
+                    pg.draw.circle(sc, WHITE, center, r + 2)
+                    pg.draw.circle(sc, BLACK, center, r)
+                    for dot in dots:
+                        pg.draw.circle(sc, RED, dot, 4)
+                    btn.draw_button(sc, WHITE, 150, 40, 10, 150, 40)
+                    btn.write_text(sc, "Перезапуск", BLACK, 150, 40, 10, 150)
+                    btn_grph.draw_button(sc, WHITE, 150, 40, 210, 150, 40)
+                    btn_grph.write_text(sc, "Вывод графа", BLACK, 150, 40, 210, 150)
+                elif btn_grph.pressed((x_mouse, y_mouse)):
+                    print_graph(vertexes, list_of_edges, game_circle.get_root(), game_circle)
+                    sc.fill(BLACK)
+                    pg.draw.circle(sc, WHITE, center, r + 2)
+                    pg.draw.circle(sc, BLACK, center, r)
+                    for dot in dots:
+                        pg.draw.circle(sc, RED, dot, 4)
+                    for edge in game_circle.edges:
+                        pg.draw.line(sc, WHITE, dots[edge[0]], dots[edge[1]])
+                        pg.draw.circle(sc, RED, dots[edge[0]], 4)
+                        pg.draw.circle(sc, RED, dots[edge[1]], 4)
+                    btn.draw_button(sc, WHITE, 150, 40, 10, 150, 40)
+                    btn.write_text(sc, "Перезапуск", BLACK, 150, 40, 10, 150)
+                    btn_grph.draw_button(sc, WHITE, 150, 40, 210, 150, 40)
+                    btn_grph.write_text(sc, "Вывод графа", BLACK, 150, 40, 210, 150)
+
+        pg.display.update()
+        clock.tick(FPS)
+
+
 def print_graph(vertexes, list_of_edges, game, position):
     WIDTH = 1200
     HEIGTH = 600
@@ -326,6 +514,7 @@ def print_graph(vertexes, list_of_edges, game, position):
     GREEN = (0, 255, 0)
     BLUE = (0, 0, 255)
     sc.fill(WHITE)
+    game.pos = [100, 100]
     bfs_lvl(game)
     for edge in list_of_edges:
         if edge[0] in vertexes and edge[1] in vertexes:
@@ -365,14 +554,15 @@ def print_graph(vertexes, list_of_edges, game, position):
                 sc.blit(text1, [text_x, text_y])
 
         if flag:
-            pg.draw.rect(sc, WHITE, ((3 / 4) * sc.get_width() - 50, 100, 100, 50))
+            pg.draw.rect(sc, WHITE, ((3 / 4) * sc.get_width() - 100, 100, 300, 50))
         pg.display.update()
         clock.tick(FPS)
 
 
 surface = pg.display.set_mode((600, 400))
-menu = pygame_menu.Menu('Welcome', 400, 300, theme=pygame_menu.themes.THEME_BLUE)
-menu.add.text_input('Difficulty :', default='5', onreturn=set_difficulty)
-menu.add.button('Play', start_game_xxx)
-menu.add.button('Quit', pygame_menu.events.EXIT)
+menu = pygame_menu.Menu('Игры на графах', 400, 300, theme=pygame_menu.themes.THEME_BLUE)
+menu.add.text_input('Количество клеток: ', default='5', onreturn=set_difficulty)
+menu.add.button('Крестики без ноликов', start_game_xxx)
+menu.add.button('Круги', start_game_circle)
+menu.add.button('Выход', pygame_menu.events.EXIT)
 menu.mainloop(surface)
