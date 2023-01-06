@@ -4,36 +4,33 @@ import pygame as pg
 from Games import Game_xxx
 from Games import GameCircle
 from math import sin, cos, pi
-import pygame_menu
 pg.init()
 Difficulty = 5
 
+
 class Button:
-    def __init__(self, surface = None, color = None, x = 0, y = 0, length = 0, height = 0, width = None, text = None, text_color = None):
+    def __init__(self, surface = None, color = None, x = 0, y = 0, length = 0, height = 0, text = None, text_color = None):
+        self.surface = surface
+        self.color = color
+        self.x = x
+        self.y = y
+        self.length = length
+        self.height = height
+        self.text = text
+        self.text_color = text_color
         if surface is not None:
-            surface = self.draw_button(surface, color, length, height, x, y, width)
-            self.write_text(surface, text, text_color, length, height, x, y)
-        self.rect = pg.Rect(x,y, length, height)
+            self.draw_button()
+            self.write_text()
+        self.rect = pg.Rect(x, y, length, height)
 
-    def write_text(self, surface, text, text_color, length, height, x, y):
-        myFont = pg.font.SysFont("Calibri", 20)
-        myText = myFont.render(text, True, text_color)
-        surface.blit(myText, ((x+length/2) - myText.get_width()/2, (y+height/2) - myText.get_height()/2))
-        return surface
+    def write_text(self):
+        my_font = pg.font.SysFont("Calibri", 20)
+        my_text = my_font.render(self.text, True, self.text_color)
+        self.surface.blit(my_text, ((self.x+self.length/2) - my_text.get_width()/2, (self.y+self.height/2) - my_text.get_height()/2))
 
-    def draw_button(self, surface, color, length, height, x, y, width):
-        for i in range(1,10):
-            s = pg.Surface((length+(i*2),height+(i*2)))
-            s.fill(color)
-            alpha = (255/(i+2))
-            if alpha <= 0:
-                alpha = 1
-            s.set_alpha(alpha)
-            pg.draw.rect(s, color, (x-i,y-i,length+i,height+i), width)
-            surface.blit(s, (x-i,y-i))
-        pg.draw.rect(surface, color, (x,y,length,height), 0)
-        pg.draw.rect(surface, (190,190,190), (x,y,length,height), 1)
-        return surface
+    def draw_button(self):
+        pg.draw.rect(self.surface, self.color, (self.x, self.y, self.length, self.height), 0)
+        pg.draw.rect(self.surface, (190, 190, 190), (self.x, self.y, self.length, self.height), 1)
 
     def pressed(self, mouse):
         if mouse[0] > self.rect.topleft[0]:
@@ -134,9 +131,66 @@ def create_matrix(list_of_edges, vertexes):
     return matrix
 
 
-def set_difficulty(value = "5"):
+def set_difficulty():
     global Difficulty
-    Difficulty = int(value)
+    WIDTH = 600
+    HEIGTH = 400
+    sc = pg.display.set_mode((WIDTH, HEIGTH))
+    BLACK = (0, 0, 0)
+    WHITE = (255, 255, 255)
+    sc.fill(BLACK)
+    font = pg.font.SysFont('Calibri', 45)
+    head = font.render("Размер поля", True, WHITE, 5)
+    head_rect = head.get_rect()
+    head_x = sc.get_width() / 2 - head_rect.width / 2
+    head_y = 10
+    sc.blit(head, [head_x, head_y])
+    btn = Button(sc, WHITE, 230, 300, 150, 40, "Вернуться к игре", BLACK)
+
+    slider_value = 50
+
+    slider_width = 300
+    slider_height = 50
+    slider_x = 150
+    slider_y = 125
+    handle_width = 50
+    handle_height = 50
+    handle_x = slider_x + (slider_value * (slider_width - handle_width) / 100)
+    handle_y = slider_y
+
+    dragging = False
+    while True:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                quit()
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                if btn.pressed(pg.mouse.get_pos()):
+                    return 0
+                mouse_x, mouse_y = pg.mouse.get_pos()
+                if handle_x <= mouse_x <= handle_x + handle_width and handle_y <= mouse_y <= handle_y + handle_height:
+                    dragging = True
+            elif event.type == pg.MOUSEBUTTONUP:
+                dragging = False
+            elif event.type == pg.MOUSEMOTION:
+                if dragging:
+                    mouse_x, mouse_y = pg.mouse.get_pos()
+                    handle_x = max(slider_x, min(mouse_x - handle_width / 2, slider_x + slider_width - handle_width))
+                    slider_value = int((handle_x - slider_x) * 100 / (slider_width - handle_width))
+                    Difficulty = slider_value // 10
+
+        sc.fill(BLACK)
+        sc.blit(head, [head_x, head_y])
+        btn.draw_button()
+        btn.write_text()
+        pg.draw.rect(sc, WHITE, (slider_x, slider_y, slider_width, slider_height))
+        pg.draw.rect(sc, (100, 0, 0), (handle_x, handle_y, handle_width, handle_height))
+        text = font.render(str(Difficulty), True, WHITE, 5)
+        text_rect = text.get_rect()
+        text_x = sc.get_width() / 2 - text_rect.width / 2
+        text_y = 230
+        sc.blit(text, [text_x, text_y])
+        pg.display.update()
 
 
 def win_check_xxx(field):
@@ -237,6 +291,39 @@ def bot_decision(root : Game_xxx):
             return root, False
 
 
+def open_info(text):
+    WIDTH = 600
+    HEIGTH = 400
+    sc = pg.display.set_mode((WIDTH, HEIGTH))
+    BLACK = (0, 0, 0)
+    WHITE = (255, 255, 255)
+    sc.fill(BLACK)
+    font = pg.font.SysFont('Calibri', 45)
+    head = font.render("Справка", True, WHITE, 5)
+    head_rect = head.get_rect()
+    head_x = sc.get_width() / 2 - head_rect.width / 2
+    head_y = 10
+    sc.blit(head, [head_x, head_y])
+    textlines = text.split("\n")
+    font = pg.font.SysFont('Calibri', 25)
+    text_x = 20
+    text_y = 60
+    for line in textlines:
+        text = font.render(line, True, WHITE, 5)
+        sc.blit(text, [text_x, text_y])
+        text_y += 25
+    btn = Button(sc, WHITE, 230, 300, 150, 40, "Вернуться к игре", BLACK)
+    pg.display.update()
+    while True:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                quit()
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                if btn.pressed(pg.mouse.get_pos()):
+                    return 0
+
+
 def start_game_xxx():
     global Difficulty
     sizeblock = 100
@@ -246,7 +333,10 @@ def start_game_xxx():
     HEIGTH = 600
     sc = pg.display.set_mode((WIDTH, HEIGTH))
     pg.display.set_caption('Крестики без ноликов!')
-
+    text = """Два игрока играют на поле 1×n (n ≥ 3),
+своим ходом игрок может поставить крестик в любую
+свободную клетку. Игрок, после хода которого на 
+поле есть ряд из трех крестиков, побеждает"""
     clock = pg.time.Clock()
 
     FPS = 30
@@ -274,8 +364,11 @@ def start_game_xxx():
     query = 0
     field = copy(game_xxx.field)
     game_over = False
-    btn = Button(sc, WHITE, 10, 150, 150, 40, 40, "Перезапуск", BLACK)
-    btn_grph = Button(sc, WHITE, 210, 150, 150, 40, 40, "Вывод графа", BLACK)
+    btn = Button(sc, WHITE, 10, 150, 150, 40, "Перезапуск", BLACK)
+    btn_grph = Button(sc, WHITE, 210, 150, 150, 40, "Вывод графа", BLACK)
+    btn_menu = Button(sc, WHITE, 810, 150, 150, 40, "Назад в меню", BLACK)
+    btn_ref = Button(sc, WHITE, 410, 150, 150, 40, "Справка", BLACK)
+    btn_dif = Button(sc, WHITE, 610, 150, 150, 40, "Размер поля", BLACK)
     while True:
         game_over = game_over if game_over else win_check_xxx(field)
         if game_over:
@@ -295,7 +388,7 @@ def start_game_xxx():
                 quit()
             elif event.type == pg.MOUSEBUTTONDOWN:
                 x_mouse, y_mouse = pg.mouse.get_pos()
-                if y_mouse <= sizeblock + 2*margine and not game_over:
+                if y_mouse <= sizeblock + 2*margine and not game_over and x_mouse <= sizeblock * a + margine * (a + 1):
                     col = x_mouse // (sizeblock + margine)
                     if field[col] == "_":
                         query = 0
@@ -327,10 +420,16 @@ def start_game_xxx():
                         x = col * sizeblock + (col + 1) * margine
                         y = 0 * sizeblock + 1 * margine
                         pg.draw.rect(sc, WHITE, (x, y, sizeblock, sizeblock))
-                    btn.draw_button(sc, WHITE, 150, 40, 10, 150, 40)
-                    btn.write_text(sc, "Перезапуск", BLACK, 150, 40, 10, 150)
-                    btn_grph.draw_button(sc, WHITE, 150, 40, 210, 150, 40)
-                    btn_grph.write_text(sc, "Вывод графа", BLACK, 150, 40, 210, 150)
+                    btn.draw_button()
+                    btn.write_text()
+                    btn_grph.draw_button()
+                    btn_grph.write_text()
+                    btn_menu.draw_button()
+                    btn_menu.write_text()
+                    btn_ref.draw_button()
+                    btn_ref.write_text()
+                    btn_dif.draw_button()
+                    btn_dif.write_text()
                 elif btn_grph.pressed(pg.mouse.get_pos()):
                     print_graph(vertexes, list_of_edges, game_xxx.get_root(), game_xxx)
                     sc.fill(BLACK)
@@ -338,10 +437,40 @@ def start_game_xxx():
                         x = col * sizeblock + (col + 1) * margine
                         y = 0 * sizeblock + 1 * margine
                         pg.draw.rect(sc, WHITE, (x, y, sizeblock, sizeblock))
-                    btn.draw_button(sc, WHITE, 150, 40, 10, 150, 40)
-                    btn.write_text(sc, "Перезапуск", BLACK, 150, 40, 10, 150)
-                    btn_grph.draw_button(sc, WHITE, 150, 40, 210, 150, 40)
-                    btn_grph.write_text(sc, "Вывод графа", BLACK, 150, 40, 210, 150)
+                    btn.draw_button()
+                    btn.write_text()
+                    btn_grph.draw_button()
+                    btn_grph.write_text()
+                    btn_menu.draw_button()
+                    btn_menu.write_text()
+                    btn_ref.draw_button()
+                    btn_ref.write_text()
+                    btn_dif.draw_button()
+                    btn_dif.write_text()
+                elif btn_menu.pressed(pg.mouse.get_pos()):
+                    return 0
+                elif btn_ref.pressed(pg.mouse.get_pos()):
+                    open_info(text)
+                    sc = pg.display.set_mode((WIDTH, HEIGTH))
+                    sc.fill(BLACK)
+                    for col in range(a):
+                        x = col * sizeblock + (col + 1) * margine
+                        y = 0 * sizeblock + 1 * margine
+                        pg.draw.rect(sc, WHITE, (x, y, sizeblock, sizeblock))
+                    btn.draw_button()
+                    btn.write_text()
+                    btn_grph.draw_button()
+                    btn_grph.write_text()
+                    btn_menu.draw_button()
+                    btn_menu.write_text()
+                    btn_ref.draw_button()
+                    btn_ref.write_text()
+                    btn_dif.draw_button()
+                    btn_dif.write_text()
+                elif btn_dif.pressed(pg.mouse.get_pos()):
+                    set_difficulty()
+                    start_game_xxx()
+                    return 0
         for col in range(a):
             if field[col] == "X":
                 x = col * sizeblock + (col + 1) * margine
@@ -361,10 +490,16 @@ def start_game_circle():
     WIDTH = 1200
     HEIGTH = 600
     sc = pg.display.set_mode((WIDTH, HEIGTH))
-    pg.display.set_caption('Крeub!')
+    pg.display.set_caption('Игра "ОМакс"!')
 
     clock = pg.time.Clock()
-
+    text = """Дана окружность, вдоль которой нанесены
+несколько различных точек. За один ход разрешается 
+провести хорду, которая не должна иметь общих
+точек с ранее проведенными хордами (в том числе
+они не должны иметь общих концов). Игрок, который
+не может провести хорду по этим правилам,
+считается проигравшим."""
     FPS = 30
 
     BLACK = (0, 0, 0)
@@ -407,8 +542,11 @@ def start_game_circle():
     field = copy(game_circle.nodes)
     edges = []
     game_over = False
-    btn = Button(sc, WHITE, 10, 150, 150, 40, 40, "Перезапуск", BLACK)
-    btn_grph = Button(sc, WHITE, 210, 150, 150, 40, 40, "Вывод графа", BLACK)
+    btn = Button(sc, WHITE, 10, 150, 150, 40, "Перезапуск", BLACK)
+    btn_grph = Button(sc, WHITE, 210, 150, 150, 40, "Вывод графа", BLACK)
+    btn_menu = Button(sc, WHITE, 810, 150, 150, 40, "Назад в меню", BLACK)
+    btn_ref = Button(sc, WHITE, 410, 150, 150, 40, "Справка", BLACK)
+    btn_dif = Button(sc, WHITE, 610, 150, 150, 40, "Размер поля", BLACK)
     move = []
     while True:
         game_over = game_over if game_over else game_circle.check_lose()
@@ -477,10 +615,16 @@ def start_game_circle():
                     pg.draw.circle(sc, BLACK, center, r)
                     for dot in dots:
                         pg.draw.circle(sc, RED, dot, 4)
-                    btn.draw_button(sc, WHITE, 150, 40, 10, 150, 40)
-                    btn.write_text(sc, "Перезапуск", BLACK, 150, 40, 10, 150)
-                    btn_grph.draw_button(sc, WHITE, 150, 40, 210, 150, 40)
-                    btn_grph.write_text(sc, "Вывод графа", BLACK, 150, 40, 210, 150)
+                    btn.draw_button()
+                    btn.write_text()
+                    btn_grph.draw_button()
+                    btn_grph.write_text()
+                    btn_menu.draw_button()
+                    btn_menu.write_text()
+                    btn_ref.draw_button()
+                    btn_ref.write_text()
+                    btn_dif.draw_button()
+                    btn_dif.write_text()
                 elif btn_grph.pressed((x_mouse, y_mouse)):
                     print_graph(vertexes, list_of_edges, game_circle.get_root(), game_circle)
                     sc.fill(BLACK)
@@ -492,10 +636,44 @@ def start_game_circle():
                         pg.draw.line(sc, WHITE, dots[edge[0]], dots[edge[1]])
                         pg.draw.circle(sc, RED, dots[edge[0]], 4)
                         pg.draw.circle(sc, RED, dots[edge[1]], 4)
-                    btn.draw_button(sc, WHITE, 150, 40, 10, 150, 40)
-                    btn.write_text(sc, "Перезапуск", BLACK, 150, 40, 10, 150)
-                    btn_grph.draw_button(sc, WHITE, 150, 40, 210, 150, 40)
-                    btn_grph.write_text(sc, "Вывод графа", BLACK, 150, 40, 210, 150)
+                    btn.draw_button()
+                    btn.write_text()
+                    btn_grph.draw_button()
+                    btn_grph.write_text()
+                    btn_menu.draw_button()
+                    btn_menu.write_text()
+                    btn_ref.draw_button()
+                    btn_ref.write_text()
+                    btn_dif.draw_button()
+                    btn_dif.write_text()
+                elif btn_menu.pressed(pg.mouse.get_pos()):
+                    return 0
+                elif btn_ref.pressed(pg.mouse.get_pos()):
+                    open_info(text)
+                    sc = pg.display.set_mode((WIDTH, HEIGTH))
+                    sc.fill(BLACK)
+                    pg.draw.circle(sc, WHITE, center, r + 2)
+                    pg.draw.circle(sc, BLACK, center, r)
+                    for dot in dots:
+                        pg.draw.circle(sc, RED, dot, 4)
+                    for edge in game_circle.edges:
+                        pg.draw.line(sc, WHITE, dots[edge[0]], dots[edge[1]])
+                        pg.draw.circle(sc, RED, dots[edge[0]], 4)
+                        pg.draw.circle(sc, RED, dots[edge[1]], 4)
+                    btn.draw_button()
+                    btn.write_text()
+                    btn_grph.draw_button()
+                    btn_grph.write_text()
+                    btn_menu.draw_button()
+                    btn_menu.write_text()
+                    btn_ref.draw_button()
+                    btn_ref.write_text()
+                    btn_dif.draw_button()
+                    btn_dif.write_text()
+                elif btn_dif.pressed(pg.mouse.get_pos()):
+                    set_difficulty()
+                    start_game_circle()
+                    return 0
 
         pg.display.update()
         clock.tick(FPS)
@@ -532,7 +710,7 @@ def print_graph(vertexes, list_of_edges, game, position):
         pg.draw.circle(sc, color, v.pos, radius=r)
         buttons[v] = Button(x=(v.pos[0] - r), y=(v.pos[1] - r), length=2*r, height=2*r)
 
-    btn = Button(sc, WHITE, (3 / 4) * sc.get_width(), 150, 150, 40, 40, "Вернуться к игре", BLACK)
+    btn = Button(sc, WHITE, (3 / 4) * sc.get_width(), 150, 150, 40, "Вернуться к игре", BLACK)
     pg.display.update()
     while True:
         for event in pg.event.get():
@@ -558,11 +736,52 @@ def print_graph(vertexes, list_of_edges, game, position):
         pg.display.update()
         clock.tick(FPS)
 
-
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+RED = (225, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
 surface = pg.display.set_mode((600, 400))
-menu = pygame_menu.Menu('Игры на графах', 400, 300, theme=pygame_menu.themes.THEME_BLUE)
-menu.add.text_input('Количество клеток: ', default='5', onreturn=set_difficulty)
-menu.add.button('Крестики без ноликов', start_game_xxx)
-menu.add.button('Круги', start_game_circle)
-menu.add.button('Выход', pygame_menu.events.EXIT)
-menu.mainloop(surface)
+surface.fill(BLACK)
+font = pg.font.SysFont('Calibri', 45)
+text1 = font.render("Игры на графах", True, WHITE, 5)
+clock = pg.time.Clock()
+x = surface.get_width() / 2 - 125
+y = 75
+FPS = 30
+surface.blit(text1, [surface.get_width() / 2 - text1.get_rect().width / 2, y - 25])
+btn_menu2 = Button(surface, WHITE, x, y + 50, 250, 40, "Крестики без ноликов", BLACK)
+btn_menu3 = Button(surface, WHITE, x, y + 100, 250, 40, 'Игра "ОМакс"', BLACK)
+btn_menu4 = Button(surface, WHITE, x, y + 150, 250, 40, "Выход", BLACK)
+while True:
+    for event in pg.event.get():
+        if event.type == pg.QUIT:
+            pg.quit()
+            quit()
+        elif event.type == pg.MOUSEBUTTONDOWN:
+            if btn_menu2.pressed(pg.mouse.get_pos()):
+                start_game_xxx()
+                surface = pg.display.set_mode((600, 400))
+                surface.blit(text1, [surface.get_width() / 2 - text1.get_rect().width / 2, y - 25])
+                btn_menu2.draw_button()
+                btn_menu2.write_text()
+                btn_menu3.draw_button()
+                btn_menu3.write_text()
+                btn_menu4.draw_button()
+                btn_menu4.write_text()
+            elif btn_menu3.pressed(pg.mouse.get_pos()):
+                start_game_circle()
+                surface = pg.display.set_mode((600, 400))
+                surface.blit(text1, [surface.get_width() / 2 - text1.get_rect().width / 2, y - 25])
+                btn_menu2.draw_button()
+                btn_menu2.write_text()
+                btn_menu3.draw_button()
+                btn_menu3.write_text()
+                btn_menu4.draw_button()
+                btn_menu4.write_text()
+            elif btn_menu4.pressed(pg.mouse.get_pos()):
+                pg.quit()
+                quit()
+
+    pg.display.update()
+    clock.tick(FPS)
