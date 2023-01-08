@@ -1,21 +1,27 @@
-class Game:
-    def __init__(self):
-        self.children = list()
-        self.parents = list()
-        self.terms = list()
+class GameHackenbush:
+    def __init__(self, list_of_vertex, matrix, node):
+        self.children = []
+        self.parents = []
+        self.terms = []
+        self.root = node
+        self.list_of_vertexes = list_of_vertex
+        self.matrix = matrix
         self.mark = ""
         self.id = "0"
         self.pos = [100, 100]
         self.lvl = 0
 
-    def create_child(self, field):
-        child = Game(field)
+    def create_child(self, list_of_vertex, matrix):
+        child = GameHackenbush(list_of_vertex, matrix, self.root)
         self.children.append(child)
         child.lvl = self.lvl + 1
         child.parents.append(self)
 
     def check_lose(self):
-        pass
+        for value in self.matrix[self.root]:
+            if value == 1:
+                return False
+        return True
 
     def get_root(self):
         if not self.parents:
@@ -26,14 +32,26 @@ class Game:
                 working_node = working_node.parents[0]
             return working_node
 
-    def move(self, i):
-        pass
-
-    def can_do_move(self, i):
-        pass
+    def can_do_move(self, v1, v2):
+        def dfs_hack(node, matrix):
+            nonlocal v_vertexes
+            v_vertexes.append(node)
+            for v in range(len(matrix[node])):
+                if matrix[node][v] == 1 and v not in v_vertexes:
+                    dfs_hack(v, matrix)
+        v_vertexes = []
+        dfs_hack(self.root, self.matrix)
+        if v1 not in v_vertexes or v2 not in v_vertexes:
+            return False
+        elif self.matrix[v1][v2] == 1:
+            return True
+        return False
 
     def __len__(self):
-        return len(self.field)
+        return len(self.matrix)
+
+    def __str__(self):
+        return str(self.matrix)
 
 
 class Game_xxx:
@@ -70,9 +88,6 @@ class Game_xxx:
 
     def __str__(self):
         return "".join(self.field) + self.mark
-
-    def move(self, i):
-        self.field[i] = "X"
 
     def can_do_move(self, i):
         if self.field[i] == "X":

@@ -1,8 +1,10 @@
 import random
 from copy import copy
+from copy import deepcopy
 import pygame as pg
 from Games import Game_xxx
 from Games import GameCircle
+from Games import GameHackenbush
 from math import sin, cos, pi
 pg.init()
 Difficulty = 5
@@ -44,6 +46,17 @@ class Button:
         else: return False
 
 
+class Edge:
+    def __init__(self, v1, v2, vn1, vn2):
+        self.v1 = v1
+        self.v2 = v2
+        self.vn1 = vn1
+        self.vn2 = vn2
+
+    def pressed(self, mouse):
+        return abs((self.v2[1] - self.v1[1]) * mouse[0] - (self.v2[0] - self.v1[0]) * mouse[1] + self.v2[0] * self.v1[1] - self.v2[1] * self.v1[0]) / ((self.v2[1] - self.v1[1]) ** 2 + (self.v2[0] - self.v1[0]) ** 2) ** 0.5 < 5
+
+
 def make_game_xxx(game):
     if not game.check_lose():
         for i in range(len(game)):
@@ -68,6 +81,22 @@ def make_game_circle(game):
                     game.create_child(new_edges)
                     game.children[-1].id = str(game.id) + "_" + str(i)
                     make_game_circle(game.children[-1])
+    else:
+        root = game.get_root()
+        root.terms.append(game)
+
+
+def make_game_hack(game):
+    if not game.check_lose():
+        for i in range(len(game)):
+            for j in range(len(game)):
+                if game.can_do_move(i, j) and i != j:
+                    new_matrix = deepcopy(game.matrix)
+                    new_matrix[i][j] = 0
+                    new_matrix[j][i] = 0
+                    game.create_child(game.list_of_vertexes, new_matrix)
+                    game.children[-1].id = str(game.id) + "_" + str(i)
+                    make_game_hack(game.children[-1])
     else:
         root = game.get_root()
         root.terms.append(game)
@@ -211,6 +240,14 @@ def edge_com(edges1, edges2):
     return True
 
 
+def matrix_com(matrix1, matrix2):
+    for i in range(len(matrix1)):
+        for j in range(len(matrix2)):
+            if matrix1[i][j] != matrix2[i][j]:
+                return False
+    return True
+
+
 def vertex_merge_circle(vertexes : set):
     vertexes = list(vertexes)
     for v1 in vertexes:
@@ -229,6 +266,19 @@ def vertex_merge_xxx(vertexes : set):
     for v1 in vertexes:
         for v2 in vertexes:
             if v1 != v2 and v1.field == v2.field:
+                v1.parents.extend(v2.parents)
+                for v3 in v2.parents:
+                    v3.children.append(v1)
+                    v3.children.remove(v2)
+                vertexes.remove(v2)
+    return vertexes
+
+
+def vertex_merge_hack(vertexes : set):
+    vertexes = list(vertexes)
+    for v1 in vertexes:
+        for v2 in vertexes:
+            if v1 != v2 and matrix_com(v1.matrix, v2.matrix):
                 v1.parents.extend(v2.parents)
                 for v3 in v2.parents:
                     v3.children.append(v1)
@@ -261,6 +311,8 @@ def get_vertexes(root):
     create_vertex(root)
     if type(root) is GameCircle:
         return vertex_merge_circle(vertexes)
+    elif type(root) is GameHackenbush:
+        return vertex_merge_hack(vertexes)
     else:
         return vertex_merge_xxx(vertexes)
 
@@ -388,7 +440,7 @@ def start_game_xxx():
                 quit()
             elif event.type == pg.MOUSEBUTTONDOWN:
                 x_mouse, y_mouse = pg.mouse.get_pos()
-                if y_mouse <= sizeblock + 2*margine and not game_over and x_mouse <= sizeblock * a + margine * (a + 1):
+                if y_mouse <= sizeblock + 2*margine and not game_over and x_mouse < sizeblock * a + margine * a:
                     col = x_mouse // (sizeblock + margine)
                     if field[col] == "_":
                         query = 0
@@ -530,14 +582,13 @@ def start_game_circle():
 
     dots = []
     angle = 0
-    while angle < 2 * pi:
+    while angle < 2 * pi - 0.1:
         dots.append((int(-sin(angle) * r + center[0]), int(cos(angle) * r + center[1])))
         angle += 2 * pi / a
     dot_btns = []
     for dot in dots:
         pg.draw.circle(sc, RED, dot, 4)
         dot_btns.append(Button(x=dot[0] - 4, y=dot[1] - 4, length=2*4, height=2*4))
-
     query = 0
     field = copy(game_circle.nodes)
     edges = []
@@ -679,6 +730,313 @@ def start_game_circle():
         clock.tick(FPS)
 
 
+def edit_hack():
+    sc = pg.display.set_mode((800, 600))
+    pg.display.set_caption("Редактор")
+
+    clock = pg.time.Clock()
+    FPS = 30
+    WHITE = (255, 255, 255)
+    BLACK = (0, 0, 0)
+    GREEN = (0, 255, 0)
+    list_node = dict()
+    matrix = []
+    node_selected = False
+    node_selected_index = -1
+    idd = 0
+    sc.fill(WHITE)
+    btn_end = Button(sc, WHITE, 110, 450, 150, 40, "Задать", BLACK)
+    btn_menu = Button(sc, WHITE, 310, 450, 150, 40, "Назад в меню", BLACK)
+    while True:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                quit()
+            if event.type == pg.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = pg.mouse.get_pos()
+                if event.button == 1:
+                    if btn_end.pressed(pg.mouse.get_pos()):
+                        return list_node, matrix
+                    elif btn_menu.pressed(pg.mouse.get_pos()):
+                        return 0, 0
+                    else:
+                        for i in list_node.keys():
+                            if abs(list_node[i][0] - mouse_x) < 15 and abs(list_node[i][1] - mouse_y) < 15:
+                                node_selected = True
+                                node_selected_index = i
+                                break
+                        else:
+                            node_selected = False
+                            list_node[idd] = (mouse_x, mouse_y)
+                            idd += 1
+                            matrix.append([0] * idd)
+                            for line in matrix:
+                                line.extend([0] * (idd - len(line)))
+
+                if event.button == 3:
+                    nodekeys = [i for i in list_node.keys()]
+                    nodekeys.sort()
+                    for i in range(len(nodekeys)):
+                        if abs(list_node[nodekeys[i]][0] - mouse_x) < 15 and abs(
+                                list_node[nodekeys[i]][1] - mouse_y) < 15:
+                            list_node.pop(nodekeys[i])
+                            for line in matrix:
+                                line.pop(i)
+                            matrix.pop(i)
+                            idd -= 1
+                            break
+            if event.type == pg.MOUSEBUTTONUP:
+                mouse_x, mouse_y = pg.mouse.get_pos()
+                if event.button == 1:
+                    if node_selected:
+                        nodekeys = [i for i in list_node.keys()]
+                        nodekeys.sort()
+                        for i in range(len(nodekeys)):
+                            if abs(list_node[nodekeys[i]][0] - mouse_x) < 15 and abs(
+                                    list_node[nodekeys[i]][1] - mouse_y) < 15:
+                                if i != node_selected_index:
+                                    matrix[node_selected_index][i] = 1
+                                    matrix[i][node_selected_index] = 1
+                                break
+                        node_selected = False
+
+        sc.fill(WHITE)
+        if node_selected:
+            pg.draw.line(sc, (0, 0, 0), list_node[node_selected_index], pg.mouse.get_pos(), 4)
+
+        nodekeys = [i for i in list_node.keys()]
+        nodekeys.sort()
+        for i in range(len(nodekeys)):
+            for j in range(len(nodekeys)):
+                if matrix[i][j] == 1:
+                    pg.draw.line(sc, BLACK, list_node[nodekeys[i]], list_node[nodekeys[j]], 5)
+
+        for key in list_node.keys():
+            pg.draw.circle(sc, GREEN, list_node[key], 15)
+        btn_end.draw_button()
+        btn_end.write_text()
+        btn_menu.draw_button()
+        btn_menu.write_text()
+        clock.tick(FPS)
+        pg.display.update()
+
+
+def start_game_hack():
+    list_node, matrix = edit_hack()
+    if list_node == 0 and matrix == 0:
+        return 0
+
+    for key in list_node.keys():
+        list_node[key] = (list_node[key][0], list_node[key][1] + 150)
+    WIDTH = 1200
+    HEIGTH = 600
+    sc = pg.display.set_mode((WIDTH, HEIGTH))
+    pg.display.set_caption('Игра "Хакенбуш"!')
+
+    clock = pg.time.Clock()
+    text = """Пусть задан неориентированный граф G и вершина s
+в нем. Два игрока делают ходы по очереди. Своим 
+ходом игрок может выбрать любое ребро графа и 
+удалить его. Игрок, который не может сделать ход,
+поскольку граф состоит из единственной вершины
+s — проигрывает"""
+    FPS = 30
+
+    BLACK = (0, 0, 0)
+    WHITE = (255, 255, 255)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+
+    sc.fill(BLACK)
+    font = pg.font.SysFont('Calibri', 45)
+    text1 = font.render("Loading", True, WHITE, 5)
+    text_rect = text1.get_rect()
+    text_x = sc.get_width() / 2 - text_rect.width / 2
+    text_y = (1 / 2) * sc.get_height() - text_rect.height / 2
+    sc.blit(text1, [text_x, text_y])
+    pg.display.update()
+
+
+    game_hack = GameHackenbush(list_node, matrix, 0)
+    make_game_hack(game_hack)
+    vertexes = get_vertexes(game_hack)
+
+    list_of_edges = get_edges(game_hack)
+    vertex_marking(vertexes=vertexes, list_of_edges=list_of_edges, root=game_hack)
+
+    sc.fill(BLACK)
+    edges = []
+    nodekeys = [i for i in list_node.keys()]
+    nodekeys.sort()
+    for i in range(len(nodekeys)):
+        for j in range(len(nodekeys)):
+            if matrix[i][j] == 1:
+                pg.draw.line(sc, WHITE, list_node[nodekeys[i]], list_node[nodekeys[j]], 5)
+                edges.append(Edge(list_node[nodekeys[i]], list_node[nodekeys[j]], nodekeys[i], nodekeys[j]))
+
+    for key in list_node.keys():
+        pg.draw.circle(sc, GREEN, list_node[key], 15)
+
+    pg.draw.circle(sc, RED, list_node[game_hack.root], 15)
+    query = 0
+    field = deepcopy(game_hack.matrix)
+
+    game_over = False
+    btn = Button(sc, WHITE, 10, 150, 150, 40, "Перезапуск", BLACK)
+    btn_grph = Button(sc, WHITE, 210, 150, 150, 40, "Вывод графа", BLACK)
+    btn_menu = Button(sc, WHITE, 810, 150, 150, 40, "Назад в меню", BLACK)
+    btn_ref = Button(sc, WHITE, 410, 150, 150, 40, "Справка", BLACK)
+    while True:
+        game_over = game_over if game_over else game_hack.check_lose()
+        if game_over:
+            font = pg.font.SysFont('Calibri', 45)
+            if query == 0:
+                text1 = font.render("You win", True, WHITE, 5)
+            else:
+                text1 = font.render("You lose", True, WHITE, 5)
+            text_rect = text1.get_rect()
+            text_x = sc.get_width() / 2 - text_rect.width / 2 + 100
+            text_y = (3 / 4) * sc.get_height() - text_rect.height / 2
+            sc.blit(text1, [text_x, text_y])
+
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                quit()
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                x_mouse, y_mouse = pg.mouse.get_pos()
+                for col in range(len(edges)):
+                    if edges[col].pressed((x_mouse, y_mouse)) and not game_over:
+                        if game_hack.can_do_move(edges[col].vn1, edges[col].vn2):
+                            query = 0
+                            field[edges[col].vn1][edges[col].vn2] = 0
+                            field[edges[col].vn2][edges[col].vn1] = 0
+                            for i in range(len(game_hack.children)):
+                                if matrix_com(game_hack.children[i].matrix, field):
+                                    game_hack = game_hack.children[i]
+                                    break
+                            sc.fill(BLACK)
+                            nodekeys = [i for i in list_node.keys()]
+                            nodekeys.sort()
+                            for i in range(len(nodekeys)):
+                                for j in range(len(nodekeys)):
+                                    if field[i][j] == 1:
+                                        pg.draw.line(sc, WHITE, list_node[nodekeys[i]], list_node[nodekeys[j]], 5)
+
+                            for key in list_node.keys():
+                                pg.draw.circle(sc, GREEN, list_node[key], 15)
+
+                            pg.draw.circle(sc, RED, list_node[game_hack.root], 15)
+                            btn.draw_button()
+                            btn.write_text()
+                            btn_grph.draw_button()
+                            btn_grph.write_text()
+                            btn_menu.draw_button()
+                            btn_menu.write_text()
+                            btn_ref.draw_button()
+                            btn_ref.write_text()
+                            game_hack, flag = bot_decision(game_hack)
+                            if flag:
+                                field = deepcopy(game_hack.matrix)
+                                query = 1
+                                sc.fill(BLACK)
+                                nodekeys = [i for i in list_node.keys()]
+                                nodekeys.sort()
+                                for i in range(len(nodekeys)):
+                                    for j in range(len(nodekeys)):
+                                        if field[i][j] == 1:
+                                            pg.draw.line(sc, WHITE, list_node[nodekeys[i]], list_node[nodekeys[j]], 5)
+
+                                for key in list_node.keys():
+                                    pg.draw.circle(sc, GREEN, list_node[key], 15)
+
+                                pg.draw.circle(sc, RED, list_node[game_hack.root], 15)
+                                btn.draw_button()
+                                btn.write_text()
+                                btn_grph.draw_button()
+                                btn_grph.write_text()
+                                btn_menu.draw_button()
+                                btn_menu.write_text()
+                                btn_ref.draw_button()
+                                btn_ref.write_text()
+                            else:
+                                game_over = True
+                if btn.pressed((x_mouse, y_mouse)):
+                    game_over = False
+                    game_hack = game_hack.get_root()
+                    field = deepcopy(game_hack.matrix)
+                    sc.fill(BLACK)
+                    nodekeys = [i for i in list_node.keys()]
+                    nodekeys.sort()
+                    for i in range(len(nodekeys)):
+                        for j in range(len(nodekeys)):
+                            if field[i][j] == 1:
+                                pg.draw.line(sc, WHITE, list_node[nodekeys[i]], list_node[nodekeys[j]], 5)
+
+                    for key in list_node.keys():
+                        pg.draw.circle(sc, GREEN, list_node[key], 15)
+
+                    pg.draw.circle(sc, RED, list_node[game_hack.root], 15)
+                    btn.draw_button()
+                    btn.write_text()
+                    btn_grph.draw_button()
+                    btn_grph.write_text()
+                    btn_menu.draw_button()
+                    btn_menu.write_text()
+                    btn_ref.draw_button()
+                    btn_ref.write_text()
+                elif btn_grph.pressed((x_mouse, y_mouse)):
+                    print_graph(vertexes, list_of_edges, game_hack.get_root(), game_hack)
+                    sc.fill(BLACK)
+                    nodekeys = [i for i in list_node.keys()]
+                    nodekeys.sort()
+                    for i in range(len(nodekeys)):
+                        for j in range(len(nodekeys)):
+                            if field[i][j] == 1:
+                                pg.draw.line(sc, WHITE, list_node[nodekeys[i]], list_node[nodekeys[j]], 5)
+
+                    for key in list_node.keys():
+                        pg.draw.circle(sc, GREEN, list_node[key], 15)
+
+                    pg.draw.circle(sc, RED, list_node[game_hack.root], 15)
+                    btn.draw_button()
+                    btn.write_text()
+                    btn_grph.draw_button()
+                    btn_grph.write_text()
+                    btn_menu.draw_button()
+                    btn_menu.write_text()
+                    btn_ref.draw_button()
+                    btn_ref.write_text()
+                elif btn_menu.pressed(pg.mouse.get_pos()):
+                    return 0
+                elif btn_ref.pressed(pg.mouse.get_pos()):
+                    open_info(text)
+                    sc = pg.display.set_mode((WIDTH, HEIGTH))
+                    sc.fill(BLACK)
+                    nodekeys = [i for i in list_node.keys()]
+                    nodekeys.sort()
+                    for i in range(len(nodekeys)):
+                        for j in range(len(nodekeys)):
+                            if field[i][j] == 1:
+                                pg.draw.line(sc, WHITE, list_node[nodekeys[i]], list_node[nodekeys[j]], 5)
+
+                    for key in list_node.keys():
+                        pg.draw.circle(sc, GREEN, list_node[key], 15)
+
+                    pg.draw.circle(sc, RED, list_node[game_hack.root], 15)
+                    btn.draw_button()
+                    btn.write_text()
+                    btn_grph.draw_button()
+                    btn_grph.write_text()
+                    btn_menu.draw_button()
+                    btn_menu.write_text()
+                    btn_ref.draw_button()
+                    btn_ref.write_text()
+
+        pg.display.update()
+        clock.tick(FPS)
+
+
 def print_graph(vertexes, list_of_edges, game, position):
     WIDTH = 1200
     HEIGTH = 600
@@ -726,13 +1084,13 @@ def print_graph(vertexes, list_of_edges, game, position):
                 font = pg.font.SysFont('Calibri', 30)
                 text1 = font.render(str(v), True, BLACK, WHITE)
                 text_rect = text1.get_rect()
-                text_x = (3 / 4) * sc.get_width() - text_rect.width / 2
-                text_y = 100
+                text_x = (1 / 4) * sc.get_width() - text_rect.width / 2
+                text_y = 10
 
                 sc.blit(text1, [text_x, text_y])
 
         if flag:
-            pg.draw.rect(sc, WHITE, ((3 / 4) * sc.get_width() - 100, 100, 300, 50))
+            pg.draw.rect(sc, WHITE, (0, 0, 1200, 50))
         pg.display.update()
         clock.tick(FPS)
 
@@ -750,19 +1108,34 @@ x = surface.get_width() / 2 - 125
 y = 75
 FPS = 30
 surface.blit(text1, [surface.get_width() / 2 - text1.get_rect().width / 2, y - 25])
-btn_menu2 = Button(surface, WHITE, x, y + 50, 250, 40, "Крестики без ноликов", BLACK)
-btn_menu3 = Button(surface, WHITE, x, y + 100, 250, 40, 'Игра "ОМакс"', BLACK)
-btn_menu4 = Button(surface, WHITE, x, y + 150, 250, 40, "Выход", BLACK)
+btn_menu1 = Button(surface, WHITE, x, y + 50, 250, 40, "Хакенбуш", BLACK)
+btn_menu2 = Button(surface, WHITE, x, y + 100, 250, 40, "Крестики без ноликов", BLACK)
+btn_menu3 = Button(surface, WHITE, x, y + 150, 250, 40, 'Игра "ОМакс"', BLACK)
+btn_menu4 = Button(surface, WHITE, x, y + 200, 250, 40, "Выход", BLACK)
 while True:
     for event in pg.event.get():
         if event.type == pg.QUIT:
             pg.quit()
             quit()
         elif event.type == pg.MOUSEBUTTONDOWN:
-            if btn_menu2.pressed(pg.mouse.get_pos()):
+            if btn_menu1.pressed(pg.mouse.get_pos()):
+                start_game_hack()
+                surface = pg.display.set_mode((600, 400))
+                surface.blit(text1, [surface.get_width() / 2 - text1.get_rect().width / 2, y - 25])
+                btn_menu1.draw_button()
+                btn_menu1.write_text()
+                btn_menu2.draw_button()
+                btn_menu2.write_text()
+                btn_menu3.draw_button()
+                btn_menu3.write_text()
+                btn_menu4.draw_button()
+                btn_menu4.write_text()
+            elif btn_menu2.pressed(pg.mouse.get_pos()):
                 start_game_xxx()
                 surface = pg.display.set_mode((600, 400))
                 surface.blit(text1, [surface.get_width() / 2 - text1.get_rect().width / 2, y - 25])
+                btn_menu1.draw_button()
+                btn_menu1.write_text()
                 btn_menu2.draw_button()
                 btn_menu2.write_text()
                 btn_menu3.draw_button()
@@ -773,6 +1146,8 @@ while True:
                 start_game_circle()
                 surface = pg.display.set_mode((600, 400))
                 surface.blit(text1, [surface.get_width() / 2 - text1.get_rect().width / 2, y - 25])
+                btn_menu1.draw_button()
+                btn_menu1.write_text()
                 btn_menu2.draw_button()
                 btn_menu2.write_text()
                 btn_menu3.draw_button()
