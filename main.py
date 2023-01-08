@@ -206,7 +206,7 @@ def set_difficulty():
                     mouse_x, mouse_y = pg.mouse.get_pos()
                     handle_x = max(slider_x, min(mouse_x - handle_width / 2, slider_x + slider_width - handle_width))
                     slider_value = int((handle_x - slider_x) * 100 / (slider_width - handle_width))
-                    Difficulty = slider_value // 10
+                    Difficulty = slider_value // 12
 
         sc.fill(BLACK)
         sc.blit(head, [head_x, head_y])
@@ -1081,10 +1081,10 @@ def print_graph(vertexes, list_of_edges, game, position):
         for v in vertexes:
             if buttons[v].pressed(pg.mouse.get_pos()):
                 flag = False
-                font = pg.font.SysFont('Calibri', 30)
+                font = pg.font.SysFont('Calibri', 25)
                 text1 = font.render(str(v), True, BLACK, WHITE)
                 text_rect = text1.get_rect()
-                text_x = (1 / 4) * sc.get_width() - text_rect.width / 2
+                text_x = (1 / 2) * sc.get_width() - text_rect.width / 2
                 text_y = 10
 
                 sc.blit(text1, [text_x, text_y])
