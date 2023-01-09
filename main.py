@@ -1,4 +1,5 @@
 import random
+from time import time
 from copy import copy
 from copy import deepcopy
 import pygame as pg
@@ -58,48 +59,92 @@ class Edge:
 
 
 def make_game_xxx(game):
-    if not game.check_lose():
-        for i in range(len(game)):
-            if game.can_do_move(i):
-                new_field = copy(game.field)
-                new_field[i] = "X"
-                game.create_child(new_field)
-                game.children[-1].id = str(game.id) + "_" + str(i)
-                make_game_xxx(game.children[-1])
-    else:
-        root = game.get_root()
-        root.terms.append(game)
+    vertexs = []
+    edges = []
+
+    def make_game_xx(game):
+        nonlocal vertexs
+        vertexs.append(game)
+        if not game.check_lose():
+            for i in range(len(game)):
+                if game.can_do_move(i):
+                    new_field = copy(game.field)
+                    new_field[i] = "X"
+                    for node in vertexs:
+                        if node.field == new_field:
+                            node.parents.append(game)
+                            game.children.append(node)
+                            edges.append([game, node])
+                            break
+                    else:
+                        game.create_child(new_field)
+                        edges.append([game, game.children[-1]])
+                        game.children[-1].id = str(game.id) + "_" + str(i)
+                        make_game_xx(game.children[-1])
+
+    make_game_xx(game)
+    return vertexs, edges
 
 
 def make_game_circle(game):
-    if not game.check_lose():
-        for i in range(len(game)):
-            for j in range(len(game)):
-                if game.can_do_move(i, j) and i != j:
-                    new_edges = copy(game.edges)
-                    new_edges.append([i, j])
-                    game.create_child(new_edges)
-                    game.children[-1].id = str(game.id) + "_" + str(i)
-                    make_game_circle(game.children[-1])
-    else:
-        root = game.get_root()
-        root.terms.append(game)
+    vertexs = []
+    edges = []
+
+    def make_game_circl(game):
+        nonlocal vertexs
+        nonlocal edges
+        vertexs.append(game)
+        if not game.check_lose():
+            for i in range(len(game)):
+                for j in range(len(game)):
+                    if game.can_do_move(i, j) and i != j:
+                        new_edges = copy(game.edges)
+                        new_edges.append([i, j])
+                        for node in vertexs:
+                            if edge_com(node.edges, new_edges):
+                                node.parents.append(game)
+                                game.children.append(node)
+                                edges.append([game, node])
+                                break
+                        else:
+                            game.create_child(new_edges)
+                            edges.append([game, game.children[-1]])
+                            game.children[-1].id = str(game.id) + "_" + str(i)
+                            make_game_circl(game.children[-1])
+
+    make_game_circl(game)
+    return vertexs, edges
 
 
 def make_game_hack(game):
-    if not game.check_lose():
-        for i in range(len(game)):
-            for j in range(len(game)):
-                if game.can_do_move(i, j) and i != j:
-                    new_matrix = deepcopy(game.matrix)
-                    new_matrix[i][j] = 0
-                    new_matrix[j][i] = 0
-                    game.create_child(game.list_of_vertexes, new_matrix)
-                    game.children[-1].id = str(game.id) + "_" + str(i)
-                    make_game_hack(game.children[-1])
-    else:
-        root = game.get_root()
-        root.terms.append(game)
+    vertexs = []
+    edges = []
+
+    def make_game_h(game):
+        nonlocal vertexs
+        nonlocal edges
+        vertexs.append(game)
+        if not game.check_lose():
+            for i in range(len(game)):
+                for j in range(len(game)):
+                    if game.can_do_move(i, j) and i != j:
+                        new_matrix = deepcopy(game.matrix)
+                        new_matrix[i][j] = 0
+                        new_matrix[j][i] = 0
+                        for node in vertexs:
+                            if matrix_com(node.matrix, new_matrix):
+                                node.parents.append(game)
+                                game.children.append(node)
+                                edges.append([game, node])
+                                break
+                        else:
+                            game.create_child(game.list_of_vertexes, new_matrix)
+                            edges.append([game, game.children[-1]])
+                            game.children[-1].id = str(game.id) + "_" + str(i)
+                            make_game_h(game.children[-1])
+
+    make_game_h(game)
+    return vertexs, edges
 
 
 def bfs_lvl(root):
@@ -121,9 +166,6 @@ def bfs_lvl(root):
 
 def vertex_marking(root, list_of_edges, vertexes):
     new_matrix = create_matrix(list_of_edges, vertexes)
-    for w_vertex in root.terms:
-        w_vertex.mark = "P"
-
     while new_matrix:
         for vertex1 in new_matrix.keys():
             flag = True
@@ -150,7 +192,6 @@ def create_matrix(list_of_edges, vertexes):
         for vertex2 in vertexes:
             vtxs[vertex2] = 0
         matrix[vertex1] = vtxs
-
     for edge in list_of_edges:
         vertex1 = edge[0]
         vertex2 = edge[1]
@@ -161,6 +202,68 @@ def create_matrix(list_of_edges, vertexes):
 
 
 def set_difficulty():
+    global Difficulty
+    WIDTH = 600
+    HEIGTH = 400
+    sc = pg.display.set_mode((WIDTH, HEIGTH))
+    BLACK = (0, 0, 0)
+    WHITE = (255, 255, 255)
+    sc.fill(BLACK)
+    font = pg.font.SysFont('Calibri', 45)
+    head = font.render("Размер поля", True, WHITE, 5)
+    head_rect = head.get_rect()
+    head_x = sc.get_width() / 2 - head_rect.width / 2
+    head_y = 10
+    sc.blit(head, [head_x, head_y])
+    btn = Button(sc, WHITE, 230, 300, 150, 40, "Вернуться к игре", BLACK)
+
+    slider_value = 50
+
+    slider_width = 300
+    slider_height = 50
+    slider_x = 150
+    slider_y = 125
+    handle_width = 50
+    handle_height = 50
+    handle_x = slider_x + (slider_value * (slider_width - handle_width) / 100)
+    handle_y = slider_y
+
+    dragging = False
+    while True:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                quit()
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                if btn.pressed(pg.mouse.get_pos()):
+                    return 0
+                mouse_x, mouse_y = pg.mouse.get_pos()
+                if handle_x <= mouse_x <= handle_x + handle_width and handle_y <= mouse_y <= handle_y + handle_height:
+                    dragging = True
+            elif event.type == pg.MOUSEBUTTONUP:
+                dragging = False
+            elif event.type == pg.MOUSEMOTION:
+                if dragging:
+                    mouse_x, mouse_y = pg.mouse.get_pos()
+                    handle_x = max(slider_x, min(mouse_x - handle_width / 2, slider_x + slider_width - handle_width))
+                    slider_value = int((handle_x - slider_x) * 100 / (slider_width - handle_width))
+                    Difficulty = slider_value // 10
+
+        sc.fill(BLACK)
+        sc.blit(head, [head_x, head_y])
+        btn.draw_button()
+        btn.write_text()
+        pg.draw.rect(sc, WHITE, (slider_x, slider_y, slider_width, slider_height))
+        pg.draw.rect(sc, (100, 0, 0), (handle_x, handle_y, handle_width, handle_height))
+        text = font.render(str(Difficulty), True, WHITE, 5)
+        text_rect = text.get_rect()
+        text_x = sc.get_width() / 2 - text_rect.width / 2
+        text_y = 230
+        sc.blit(text, [text_x, text_y])
+        pg.display.update()
+
+
+def set_difficulty_circle():
     global Difficulty
     WIDTH = 600
     HEIGTH = 400
@@ -289,32 +392,130 @@ def vertex_merge_hack(vertexes : set):
 
 def get_vertexes(root):
     vertexes = set()
+    def create_vertex_xxx(root):
+        vertexs = []
+        qstart = 0
+        queue = dict()
+        vertexs.append(root)
+        queue[root.lvl] = [0]
+        while qstart < len(vertexs):
+            v = vertexs[qstart]
+            qstart += 1
+            if v.lvl not in queue.keys():
+                queue[v.lvl] = [qstart]
+                queue[v.lvl - 1].append(qstart - 1)
+            for i in range(len(v.children)):
+                vertexs.append(v.children[i])
+        print(len(vertexs))
+        queue[vertexs[qstart - 1].lvl].append(qstart - 1)
+        for v in vertexs:
+            i = queue[v.lvl][0]
+            while i <= queue[v.lvl][1]:
+                try:
+                    if v != vertexs[i] and vertexs[i].field == v.field:
+                        v.parents.extend(vertexs[i].parents)
+                        for v3 in vertexs[i].parents:
+                            v3.children.append(v)
+                            v3.children.remove(vertexs[i])
+                        vertexs.remove(vertexs[i])
+                        queue[v.lvl][1] -= 1
+                        for j in range(v.lvl + 1, len(queue.keys())):
+                            queue[j][0] -= 1
+                            queue[j][1] -= 1
+                    else:
+                        i += 1
+                except IndexError:
+                    print(i)
+                    raise IndexError
+        print(len(vertexs))
+        return vertexs
+
+    def create_vertex_circle(root):
+        vertexs = []
+        qstart = 0
+        queue = dict()
+        vertexs.append(root)
+        queue[root.lvl] = [0]
+        while qstart < len(vertexs):
+            v = vertexs[qstart]
+            qstart += 1
+            if v.lvl not in queue.keys():
+                queue[v.lvl] = [qstart]
+                queue[v.lvl - 1].append(qstart - 1)
+            for i in range(len(v.children)):
+                vertexs.append(v.children[i])
+
+        queue[vertexs[qstart - 1].lvl].append(qstart - 1)
+        for v in vertexs:
+            i = queue[v.lvl][0]
+            while i <= queue[v.lvl][1]:
+                try:
+                    if v != vertexs[i] and edge_com(v.edges, vertexs[i].edges):
+                        v.parents.extend(vertexs[i].parents)
+                        for v3 in vertexs[i].parents:
+                            v3.children.append(v)
+                            v3.children.remove(vertexs[i])
+                        vertexs.remove(vertexs[i])
+                        queue[v.lvl][1] -= 1
+                        for j in range(v.lvl + 1, len(queue.keys())):
+                            queue[j][0] -= 1
+                            queue[j][1] -= 1
+                    else:
+                        i += 1
+                except IndexError:
+                    print(i)
+                    raise IndexError
+        return vertexs
+
+    def create_vertex_hack(root):
+        vertexs = []
+        qstart = 0
+        queue = dict()
+        vertexs.append(root)
+        queue[root.lvl] = [0]
+        while qstart < len(vertexs):
+            v = vertexs[qstart]
+            qstart += 1
+            if v.lvl not in queue.keys():
+                queue[v.lvl] = [qstart]
+                queue[v.lvl - 1].append(qstart - 1)
+            for i in range(len(v.children)):
+                vertexs.append(v.children[i])
+
+        queue[vertexs[qstart - 1].lvl].append(qstart - 1)
+        for v in vertexs:
+            i = queue[v.lvl][0]
+            while i <= queue[v.lvl][1]:
+                try:
+                    if v != vertexs[i] and matrix_com(v.matrix, vertexs[i].matrix):
+                        v.parents.extend(vertexs[i].parents)
+                        for v3 in vertexs[i].parents:
+                            v3.children.append(v)
+                            v3.children.remove(vertexs[i])
+                        vertexs.remove(vertexs[i])
+                        queue[v.lvl][1] -= 1
+                        for j in range(v.lvl + 1, len(queue.keys())):
+                            queue[j][0] -= 1
+                            queue[j][1] -= 1
+                    else:
+                        i += 1
+                except IndexError:
+                    print(i)
+                    raise IndexError
+        return vertexs
 
     def create_vertex(root):
         nonlocal vertexes
-        """flag = True
-        v1 = root
-        for v2 in vertexes:
-            if v1.field == v2.field:
-                v2.parents.extend(v1.parents)
-                flag = False
-                for v3 in v1.parents:
-                    v3.children.append(v2)
-                    v3.children.remove(v1)
-                break
-        if flag:"""
         vertexes.add(root)
         if root.children:
             for i in range(len(root.children)):
                 create_vertex(root.children[i])
-
-    create_vertex(root)
+    if type(root) is Game_xxx:
+        return create_vertex_xxx(root)
     if type(root) is GameCircle:
-        return vertex_merge_circle(vertexes)
-    elif type(root) is GameHackenbush:
-        return vertex_merge_hack(vertexes)
-    else:
-        return vertex_merge_xxx(vertexes)
+        return create_vertex_circle(root)
+    if type(root) is GameHackenbush:
+        return create_vertex_hack(root)
 
 
 def get_edges(root):
@@ -404,9 +605,9 @@ def start_game_xxx():
     sc.blit(text1, [text_x, text_y])
     pg.display.update()
     game_xxx = Game_xxx(["_" for i in range(a)])
-    make_game_xxx(game_xxx)
-    vertexes = get_vertexes(game_xxx)
-    list_of_edges = get_edges(game_xxx)
+    vertexes, list_of_edges = make_game_xxx(game_xxx)
+    #vertexes = get_vertexes(game_xxx)
+    #list_of_edges = get_edges(game_xxx)
     vertex_marking(vertexes=vertexes, list_of_edges=list_of_edges, root=game_xxx)
     sc.fill(BLACK)
     for col in range(a):
@@ -522,6 +723,7 @@ def start_game_xxx():
                 elif btn_dif.pressed(pg.mouse.get_pos()):
                     set_difficulty()
                     start_game_xxx()
+                    Difficulty = 5
                     return 0
         for col in range(a):
             if field[col] == "X":
@@ -538,6 +740,7 @@ def start_game_xxx():
 
 def start_game_circle():
     global Difficulty
+
     a = Difficulty
     WIDTH = 1200
     HEIGTH = 600
@@ -569,9 +772,9 @@ def start_game_circle():
     pg.display.update()
 
     game_circle = GameCircle([], a)
-    make_game_circle(game_circle)
-    vertexes = get_vertexes(game_circle)
-    list_of_edges = get_edges(game_circle)
+    vertexes, list_of_edges = make_game_circle(game_circle)
+    #vertexes = get_vertexes(game_circle)
+    #list_of_edges = get_edges(game_circle)
     vertex_marking(vertexes=vertexes, list_of_edges=list_of_edges, root=game_circle)
 
     sc.fill(BLACK)
@@ -722,7 +925,7 @@ def start_game_circle():
                     btn_dif.draw_button()
                     btn_dif.write_text()
                 elif btn_dif.pressed(pg.mouse.get_pos()):
-                    set_difficulty()
+                    set_difficulty_circle()
                     start_game_circle()
                     return 0
 
@@ -858,10 +1061,10 @@ s — проигрывает"""
 
 
     game_hack = GameHackenbush(list_node, matrix, 0)
-    make_game_hack(game_hack)
-    vertexes = get_vertexes(game_hack)
+    vertexes, list_of_edges = make_game_hack(game_hack)
+    #vertexes = get_vertexes(game_hack)
 
-    list_of_edges = get_edges(game_hack)
+    #list_of_edges = get_edges(game_hack)
     vertex_marking(vertexes=vertexes, list_of_edges=list_of_edges, root=game_hack)
 
     sc.fill(BLACK)
